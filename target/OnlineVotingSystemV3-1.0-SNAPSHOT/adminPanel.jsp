@@ -34,14 +34,9 @@
                         <button type="submit" class="btn">Login</button>
                     </div>
                     <div class="container signin">
-                        <% if(message!=null){
-                            if(message.equals("success")){%>
-                        <img src="images/ok-16.png" alt="Computer Man" style="width:23px;height:23px;">  <font color="#1B9B3E">Registration completed successfully </font>
-                        <%}else if(message.equals("invalid")){
-                        %>
-                        <img src="images/alert-16.png" alt="Computer Man" style="width:23px;height:23px;" autofocus> <font color="#ff0000">Invalid Account</font>
-
-                        <%}}%>
+                        <% if(request.getAttribute("message") != null && request.getAttribute("message").equals("invalid")) { %>
+                            <img src="images/alert-16.png" alt="Computer Man" style="width:23px;height:23px;" autofocus> <font color="#ff0000">Invalid Account</font>
+                        <% } %>
                         <small><p>Create an account? <a href="adminRegister.jsp">Sign up</a>.</p></small>
                     </div>
                 </center>

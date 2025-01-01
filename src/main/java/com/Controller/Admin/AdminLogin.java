@@ -21,6 +21,7 @@ public class AdminLogin extends HttpServlet {
     public AdminLogin() {
         super();
     }
+
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         HttpSession sessionAdmin = request.getSession();
         String action = request.getParameter("action");
@@ -29,50 +30,36 @@ public class AdminLogin extends HttpServlet {
         } else {
             if (action.equalsIgnoreCase("logout")) {
                 sessionAdmin.removeAttribute("adminId");
-                sessionAdmin.removeAttribute("adminNname");
+                sessionAdmin.removeAttribute("adminName");
                 response.sendRedirect("adminPanel.jsp");
             }
         }
     }
 
+    @SuppressWarnings("static-access")
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-        HttpSession sessionAdmin=request.getSession();
-        @SuppressWarnings("unused")
-        String action=request.getParameter("action");
-
+        HttpSession sessionAdmin = request.getSession();
         String username = request.getParameter("username");
         String password = request.getParameter("password");
 
-        Model m=new Model();
-        m.setUserName(username);
-        m.setPass(password);
-
-        String sql="select adminId,username,password from admin where username='"+username+"' and password='"+password+"'";
+        // Assuming Dao and Model classes are used for database operations
+        Dao dao = new Dao();
+        Model model = new Model();
+        model.setUserName(username);
+        model.setPass(password);
 
         try {
-            ResultSet rs=Dao.loginValidation(sql);
-            //ResultSet rs= Dao.adminValid(m);
-            if(rs.next()){
-                String uname= "Welcome "+rs.getString(2);
-                String adminId=String.valueOf(rs.getInt(1));
-                sessionAdmin.setAttribute("adminId",adminId);
-                sessionAdmin.setAttribute("adminName",uname);
-                request.getRequestDispatcher("adminResult.jsp").forward(request,response);
-                //response.sendRedirect("adminResult.jsp");
-            }else{
-                request.setAttribute("error", "Invalid Account");
-                response.sendRedirect("adminPanel.jsp?msg=invalid");
-                //request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
-
-                //response.sendRedirect("failAdmin.jsp");
+            ResultSet rs = dao.adminValid(model);
+            if (rs.next()) {
+                sessionAdmin.setAttribute("adminId", rs.getInt("adminId"));
+                sessionAdmin.setAttribute("adminName", rs.getString("username"));
+                response.sendRedirect("adminPanel.jsp"); // Ensure this path is correct
+            } else {
+                request.setAttribute("message", "invalid");
+                request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
             }
-
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
-
     }
-
 }
