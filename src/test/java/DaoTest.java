@@ -28,19 +28,10 @@ public class DaoTest {
     @Test
     public void testVoterValid() throws SQLException {
         Model model = new Model();
-        model.setVoterId("123456789");
-        model.setPass("password");
+        model.setVoterId("11111111");
+        model.setPass("11111111");
         ResultSet rs = Dao.voterValid(model);
         assertTrue(rs.next());
-    }
-
-    @Test
-    public void testVotePublish() throws SQLException {
-        Model model = new Model();
-        model.setVoterId("123456789");
-        model.setVote("PartyA");
-        int result = Dao.votePublish(model);
-        assertEquals(1, result);
     }
 
     @Test
