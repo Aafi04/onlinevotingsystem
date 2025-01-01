@@ -68,10 +68,10 @@ Contributions are welcome! To contribute to this project, follow these steps:
 Please ensure your code adheres to the project's coding standards and includes appropriate tests.
 
 ## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+This project is licensed under the MIT License. Check out LICENSE on GitHub for more details.
 
 ## Contact
 For any questions or feedback, please contact:
 - **Author**: Aafi04
-- **Email**: [Your Email Here]
+- **Email**: mdaafi04@gmail.com
 - **GitHub**: [Aafi04](https://github.com/Aafi04)
