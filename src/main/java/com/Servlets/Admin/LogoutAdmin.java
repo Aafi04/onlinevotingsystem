@@ -1,4 +1,4 @@
-package com.Controller.Admin;
+package com.Servlets.Admin;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;

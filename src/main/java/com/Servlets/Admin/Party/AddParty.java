@@ -1,4 +1,4 @@
-package com.Controller.Admin.Party;
+package com.Servlets.Admin.Party;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.MultipartConfig;

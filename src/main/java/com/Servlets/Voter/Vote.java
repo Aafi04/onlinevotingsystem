@@ -1,4 +1,4 @@
-package com.Controller.Voter;
+package com.Servlets.Voter;
 
 import com.Dao.Dao;
 import com.Model.Model;

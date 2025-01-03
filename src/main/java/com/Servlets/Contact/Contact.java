@@ -1,5 +1,5 @@
 
-package com.Controller.Contact;
+package com.Servlets.Contact;
 
 import com.Dao.Dao;
 import com.Model.Model;

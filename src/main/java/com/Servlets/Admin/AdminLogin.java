@@ -1,4 +1,4 @@
-package com.Controller.Admin;
+package com.Servlets.Admin;
 
 import com.Dao.Dao;
 import com.Model.Model;

@@ -1,4 +1,4 @@
-package com.Controller.Voter;
+package com.Servlets.Voter;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
