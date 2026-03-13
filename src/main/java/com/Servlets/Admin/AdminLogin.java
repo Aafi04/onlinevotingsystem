@@ -4,11 +4,13 @@ import com.Dao.Dao;
 import com.Model.Model;
 
 import java.io.IOException;
-import java.sql.ResultSet;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Base64;
-
+import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -46,46 +48,67 @@ public class AdminLogin extends HttpServlet {
         String username = request.getParameter("username");
         String password = request.getParameter("password");
 
-        // Assuming Dao and Model classes are used for database operations
-        Dao dao = new Dao();
-        Model model = new Model();
-        model.setUserName(username);
+        // Server-side validation: Check for empty fields
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            request.setAttribute("message", "emptyFields");
+            request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+            return;
+        }
 
         try {
-            ResultSet rs = dao.adminValid(model); // This now fetches password_hash and salt
-            if (rs.next()) {
-                String storedHash = rs.getString("password_hash"); // Assuming column name 'password_hash'
-                String storedSalt = rs.getString("salt");           // Assuming column name 'salt'
+            // Retrieve admin credentials (hashed password and salt) from the DAO
+            Map<String, String> adminCredentials = Dao.getAdminLoginCredentials(username);
 
-                // Decode salt from Base64
-                byte[] saltBytes = Base64.getDecoder().decode(storedSalt);
+            if (adminCredentials != null && !adminCredentials.isEmpty()) {
+                String storedHashedPasswordBase64 = adminCredentials.get("hashedPassword");
+                String storedSaltBase64 = adminCredentials.get("salt");
 
-                // Hash the provided password with the retrieved salt
+                // Ensure both hash and salt are present
+                if (storedHashedPasswordBase64 == null || storedSaltBase64 == null) {
+                    request.setAttribute("message", "invalid"); // Data integrity issue for this user
+                    request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+                    return;
+                }
+
+                // Decode stored salt and hashed password from Base64
+                byte[] storedSalt = Base64.getDecoder().decode(storedSaltBase64);
+                byte[] storedHashedPassword = Base64.getDecoder().decode(storedHashedPasswordBase64);
+
+                // Hash the incoming password with the retrieved salt
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
-                md.update(saltBytes);
-                byte[] hashedPassword = md.digest(password.getBytes("UTF-8"));
-                String base64HashedPassword = Base64.getEncoder().encodeToString(hashedPassword);
+                md.update(storedSalt);
+                byte[] incomingHashedPassword = md.digest(password.getBytes("UTF-8"));
 
                 // Compare the newly generated hash with the stored hash
-                if (base64HashedPassword.equals(storedHash)) {
-                    sessionAdmin.setAttribute("adminId", rs.getInt("adminId"));
-                    sessionAdmin.setAttribute("adminName", rs.getString("username"));
-                    response.sendRedirect("adminPanel.jsp"); // Ensure this path is correct
+                if (Arrays.equals(incomingHashedPassword, storedHashedPassword)) {
+                    sessionAdmin.setAttribute("adminId", Integer.parseInt(adminCredentials.get("adminId")));
+                    sessionAdmin.setAttribute("adminName", adminCredentials.get("username"));
+                    response.sendRedirect("adminPanel.jsp"); // Login successful
                 } else {
-                    // Password mismatch
-                    request.setAttribute("message", "invalid");
+                    request.setAttribute("message", "invalid"); // Password mismatch
                     request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
                 }
             } else {
-                // User not found
-                request.setAttribute("message", "invalid");
+                request.setAttribute("message", "invalid"); // Username not found
                 request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
             }
-        } catch (NoSuchAlgorithmException | IOException e) {
-            e.printStackTrace();
-            request.setAttribute("message", "error");
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log the database error
+            request.setAttribute("message", "dbError");
             request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace(); // Log hashing algorithm error
+            request.setAttribute("message", "hashingError");
+            request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace(); // Log encoding error
+            request.setAttribute("message", "encodingError");
+            request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+        } catch (NumberFormatException e) {
+            e.printStackTrace(); // Log error if adminId cannot be parsed
+            request.setAttribute("message", "dataError");
+            request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+        } catch (Exception e) { // Catch any other unexpected exceptions
             e.printStackTrace();
             request.setAttribute("message", "error");
             request.getRequestDispatcher("adminPanel.jsp").forward(request, response);

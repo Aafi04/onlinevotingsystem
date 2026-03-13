@@ -1,5 +1,5 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +14,7 @@
 <% if(session.getAttribute("adminName")!=null){
 %>
 <ul>
-    <li><a class="active" href="#" aria-disabled="true"><c:out value="${sessionScope.adminName}" /></a></li>
+    <li><a class="active" href="#" aria-disabled="true"><c:out value="${sessionScope.adminName}"/></a></li>
     <li style="float:right"><a href="adminLogout.jsp">Logout</a></li>
     <li style="float:right"><a href="adminRegister.jsp">New Admin</a></li>
     <li style="float:right"><a href="addParty.jsp">Party</a></li>

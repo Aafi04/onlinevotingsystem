@@ -10,9 +10,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.sql.SQLException;
 import java.util.Base64;
 
 @WebServlet(name = "AdminRegister",value = "/AdminRegister")
@@ -23,40 +25,55 @@ public class AdminRegister extends HttpServlet {
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
 
-        String fullName=request.getParameter("name");
-        String password=request.getParameter("password");
+        String fullName = request.getParameter("name");
+        String password = request.getParameter("password");
 
-        Model m=new Model();
-        m.setFullName(fullName);
+        // Server-side validation: Check for empty fields
+        if (fullName == null || fullName.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            response.sendRedirect("adminRegister.jsp?msg=emptyFields");
+            return;
+        }
 
         try {
-            // Generate a cryptographically secure salt
+            // Server-side validation: Check for duplicate username
+            if (Dao.adminUsernameExists(fullName)) {
+                response.sendRedirect("adminRegister.jsp?msg=duplicateUser");
+                return;
+            }
+
+            // Generate a random salt
             SecureRandom random = new SecureRandom();
-            byte[] salt = new byte[16];
+            byte[] salt = new byte[16]; // 16 bytes for salt
             random.nextBytes(salt);
-            String base64Salt = Base64.getEncoder().encodeToString(salt);
 
-            // Hash the password with the salt using SHA-256
+            // Hash the password using SHA-256 with the generated salt
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(salt);
-            byte[] hashedPassword = md.digest(password.getBytes("UTF-8"));
-            String base64HashedPassword = Base64.getEncoder().encodeToString(hashedPassword);
+            md.update(salt); // Add salt to the message digest
+            byte[] hashedPassword = md.digest(password.getBytes("UTF-8")); // Hash password
 
-            // Store the hashed password and salt in the model (assuming Model has setPasswordHash and setSalt methods)
-            m.setPasswordHash(base64HashedPassword);
-            m.setSalt(base64Salt);
+            // Encode salt and hashed password to Base64 for storage in the database
+            String encodedSalt = Base64.getEncoder().encodeToString(salt);
+            String encodedHashedPassword = Base64.getEncoder().encodeToString(hashedPassword);
 
-            int i= Dao.registerAdmin(m);
-            if(i!=0){
+            // Register admin with the hashed password and salt
+            int i = Dao.registerAdmin(fullName, encodedHashedPassword, encodedSalt);
+
+            if (i != 0) {
                 response.sendRedirect("adminPanel.jsp?msg=success");
-            }else {
+            } else {
                 response.sendRedirect("adminRegister.jsp?msg=failed");
             }
 
-        } catch (NoSuchAlgorithmException | IOException e) {
-            e.printStackTrace();
-            response.sendRedirect("adminRegister.jsp?msg=error");
-        } catch (Exception e){
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log the database error
+            response.sendRedirect("adminRegister.jsp?msg=dbError");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace(); // Log hashing algorithm error
+            response.sendRedirect("adminRegister.jsp?msg=hashingError");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace(); // Log encoding error
+            response.sendRedirect("adminRegister.jsp?msg=encodingError");
+        } catch (Exception e) { // Catch any other unexpected exceptions
             e.printStackTrace();
             response.sendRedirect("adminRegister.jsp?msg=error");
         }

@@ -28,7 +28,6 @@ public class AdminAuthenticationFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpSession session = httpRequest.getSession(false);
 
-        // Check for an admin-specific session attribute, e.g., "adminName"
         boolean isLoggedIn = (session != null && session.getAttribute("adminName") != null);
 
         String loginURI = httpRequest.getContextPath() + "/Admin/AdminLogin";
