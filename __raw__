@@ -1,0 +1,86 @@
+```diff
+--- a/src/test/java/DaoTest.java
++++ b/src/test/java/DaoTest.java
+@@ -9,6 +9,11 @@
+ 
+ public class DaoTest {
+ 
++    // Helper to generate unique IDs for test data
++    private String generateUniqueId() {
++        return String.valueOf(System.currentTimeMillis());
++    }
++
+     @Test
+     public void testLoginValidation() throws SQLException {
+         String sql = "SELECT * FROM admin WHERE username='Aafi' AND password='password123'";
+@@ -34,6 +39,9 @@
+ 
+     @Test
+     public void testRegister() throws SQLException {
++        // Note: This test uses a hardcoded voterId "987654321".
++        // For repeated test runs, ensure the database state is reset or
++        // this voter is deleted before this test executes, e.g., by testDeleteVoter.
+         Model model = new Model();
+         model.setVoterId("987654321");
+         model.setFullName("John Doe");
+@@ -62,4 +70,55 @@
+         int result = Dao.deleteVoter(voterId);
+         assertEquals(1, result);
+     }
++
++    // --- New tests for error handling ---
++
++    @Test
++    public void testRegisterUniqueConstraintViolation() throws SQLException {
++        String voterId = "UCV_" + generateUniqueId();
++        String username = "ucv_user_" + generateUniqueId();
++        Model model = new Model();
++        model.setVoterId(voterId);
++        model.setFullName("Unique Constraint Test");
++        model.setUserName(username);
++        model.setGender("Other");
++        model.setDob("2000-01-01");
++        model.setEmail(username + "@example.com");
++        model.setPass("password");
++
++        try {
++            // First registration should succeed
++            int result1 = Dao.register(model);
++            assertEquals(1, result1, "First registration should succeed");
++
++            // Second registration with the same unique data should throw SQLException
++            SQLException thrown = assertThrows(SQLException.class, () -> {
++                Dao.register(model);
++            }, "Expected SQLException for unique constraint violation on second registration");
++
++            // Optionally, assert specific SQLState or error message if known and stable
++            // Example: assertTrue(thrown.getMessage().contains("Duplicate entry"), "Error message should indicate duplicate entry");
++
++        } finally {
++            // Clean up the registered voter to ensure idempotency for test runs
++            // Note: If the second register call throws an exception, the voter might still be in the DB.
++            // We attempt to delete it regardless.
++            Dao.deleteVoter(voterId);
++        }
++    }
++
++    @Test
++    public void testSqlExceptionForInvalidQuery() {
++        // Provide a syntactically invalid SQL string to simulate an SQL exception during operation
++        String invalidSql = "SELECT * FROM non_existent_table WHERE id='1'";
++        
++        // Expect an SQLException to be thrown for an invalid SQL query
++        SQLException thrown = assertThrows(SQLException.class, () -> {
++            Dao.loginValidation(invalidSql);
++        }, "Expected SQLException for an invalid SQL query");
++
++        // Optionally, check the message or SQLState if specific error handling is expected
++        // Example: assertTrue(thrown.getMessage().contains("Table 'db_name.non_existent_table' doesn't exist"), "Error message should indicate table not found");
++    }
++    // Note: Testing database connection failures directly by "mocking" is not feasible without modifying
++    // the static Dao class to allow dependency injection or a configurable connection source.
++    // Under the current constraints (zero changes to Dao.java or its public API signatures),
++    // we cannot programmatically simulate a connection failure from this test class.
++    // The above tests cover other types of SQL exceptions during operations (unique constraints, invalid queries).
+ }
+```

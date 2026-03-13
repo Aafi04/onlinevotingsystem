@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.Base64;
+import java.util.Properties;
+import java.io.FileInputStream;
 
 public class Dao {
     static Connection con = null;
@@ -17,12 +19,32 @@ public class Dao {
         try
         {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            //database_name --> evoting
-            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/evoting", "root", "root");
+
+            // Load database properties from db.properties file
+            Properties dbProps = new Properties();
+            // Use getResourceAsStream for classpath loading, suitable for JARs and web apps
+            InputStream input = Dao.class.getClassLoader().getResourceAsStream("db.properties");
+
+            if (input == null) {
+                // Fallback for direct file system access during development/testing
+                // This path assumes db.properties is in the project root or accessible via relative path
+                // For production, the getResourceAsStream approach is generally preferred.
+                // You might need to adjust this path based on your deployment environment.
+                input = new FileInputStream("src/main/resources/db.properties");
+            }
+            dbProps.load(input);
+
+            String dbUrl = dbProps.getProperty("db.url");
+            String dbUser = dbProps.getProperty("db.user");
+            String dbPassword = dbProps.getProperty("db.password");
+
+            con = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
         }
         catch (Exception e)
         {
             e.printStackTrace();
+            // Optionally, rethrow as a runtime exception or handle more gracefully
+            throw new RuntimeException("Failed to initialize database connection", e);
         }
     }
     public static ResultSet loginValidation(String sql) throws SQLException{

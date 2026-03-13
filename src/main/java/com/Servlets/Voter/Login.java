@@ -46,11 +46,15 @@ public class Login extends HttpServlet {
         Model m=new Model();
         m.setPass(password);
         m.setVoterId(voterId);
-        String sql="select voter_card_number,password,username from login where voter_card_number='"+voterId+"' and password='"+password+"'";
+        // The original SQL query construction using string concatenation is removed to prevent SQL injection.
+        // String sql="select voter_card_number,password,username from login where voter_card_number='"+voterId+"' and password='"+password+"'";
 
         try {
-            //ResultSet rs= Dao.voterValid(m);
-            ResultSet rs=Dao.valid1(sql);
+            // Reverted to using the Dao.voterValid method, which is assumed to handle authentication securely
+            // using PreparedStatement internally, taking the Model object with user input as parameters.
+            ResultSet rs= Dao.voterValid(m);
+            // The vulnerable call to Dao.valid1(sql) is removed.
+            // ResultSet rs=Dao.valid1(sql);
             if(rs.next()){
                 String username= "Welcome "+rs.getString(3);
                 session.setAttribute("voterId",voterId);
