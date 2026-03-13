@@ -1,4 +1,5 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,11 +35,11 @@
                         <select type="text" name="voter" required>
                             <option disabled="disabled" selected="selected">Select Your Party</option>
                             <% while (rs.next()){
-                                String  partyCode=rs.getString(2);
-                                String  partyName=rs.getString(3);
-
+                                // Set partyCode and partyName as page attributes for JSTL c:out to access them via EL
+                                pageContext.setAttribute("partyCode", rs.getString(2));
+                                pageContext.setAttribute("partyName", rs.getString(3));
                             %>
-                            <option value="<%=partyCode%>>"><%=partyName%>(<%=partyCode%>)</option>
+                            <option value="<c:out value="${partyCode}"/>&gt;"><c:out value="${partyName}"/>(<c:out value="${partyCode}"/>)</option>
                             <%
                                 }%>
                         </select>

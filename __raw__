@@ -1,0 +1,192 @@
+```diff
+--- a/src/test/java/DaoTest.java
++++ b/src/test/java/DaoTest.java
+@@ -4,44 +4,136 @@
+ import org.junit.jupiter.api.*;
+ 
+ import java.sql.ResultSet;
+ import java.sql.SQLException;
++import java.util.UUID;
+ 
+ import static org.junit.jupiter.api.Assertions.*;
+ 
+ public class DaoTest {
+ 
++    // Helper to generate unique voter IDs for tests to prevent conflicts and ensure isolation
++    private static String generateUniqueVoterId() {
++        // Using UUID and truncating to a common ID length (e.g., 8-10 characters)
++        // Adjust length based on expected voterId format in the database
++        return UUID.randomUUID().toString().substring(0, 10).replace("-", "");
++    }
++
++    private String testVoterId;
++    private String duplicateTestVoterId;
++    private String voterIdToDelete;
++
++    @BeforeEach
++    void setUp() {
++        // Initialize unique IDs for each test to ensure isolation
++        testVoterId = generateUniqueVoterId();
++        duplicateTestVoterId = generateUniqueVoterId();
++        voterIdToDelete = generateUniqueVoterId();
++    }
++
++    @AfterEach
++    void tearDown() throws SQLException {
++        // Clean up any test data that might have been created
++        // It's important that deleteVoter handles non-existent IDs gracefully (returns 0)
++        Dao.deleteVoter(testVoterId);
++        Dao.deleteVoter(duplicateTestVoterId);
++        Dao.deleteVoter(voterIdToDelete);
++    }
++
+     @Test
+     public void testLoginValidation() throws SQLException {
+         String sql = "SELECT * FROM admin WHERE username='Aafi' AND password='password123'";
+         ResultSet rs = Dao.loginValidation(sql);
+-        assertTrue(rs.next());
++        assertTrue(rs.next(), "Expected a valid admin login to return a non-empty ResultSet.");
++        rs.close(); // Ensure ResultSet is closed
++    }
++
++    // AC3: Retrieval methods return expected empty/null results when no matching data exists.
++    @Test
++    public void testLoginValidation_NoMatch() throws SQLException {
++        String sql = "SELECT * FROM admin WHERE username='nonexistent' AND password='wrongpassword'";
++        ResultSet rs = Dao.loginValidation(sql);
++        assertFalse(rs.next(), "ResultSet should be empty for invalid login credentials.");
++        rs.close(); // Ensure ResultSet is closed
+     }
+ 
+     @Test
+     public void testAdminValid() throws SQLException {
+         Model model = new Model();
+         model.setUserName("Aafi");
+         model.setPass("password123");
+         ResultSet rs = Dao.adminValid(model);
+-        assertTrue(rs.next());
++        assertTrue(rs.next(), "Expected a valid admin to return a non-empty ResultSet.");
++        rs.close(); // Ensure ResultSet is closed
++    }
++
++    // AC3: Retrieval methods return expected empty/null results when no matching data exists.
++    @Test
++    public void testAdminValid_NoMatch() throws SQLException {
++        Model model = new Model();
++        model.setUserName("nonexistentAdmin");
++        model.setPass("wrongPass");
++        ResultSet rs = Dao.adminValid(model);
++        assertFalse(rs.next(), "ResultSet should be empty for invalid admin credentials.");
++        rs.close(); // Ensure ResultSet is closed
+     }
+ 
+     @Test
+     public void testVoterValid() throws SQLException {
+         Model model = new Model();
+         model.setVoterId("11111111"); // Assuming this voter exists in the test database
+         model.setPass("11111111");
+         ResultSet rs = Dao.voterValid(model);
+-        assertTrue(rs.next());
++        assertTrue(rs.next(), "Expected a valid voter to return a non-empty ResultSet.");
++        rs.close(); // Ensure ResultSet is closed
++    }
++
++    // AC3: Retrieval methods return expected empty/null results when no matching data exists.
++    @Test
++    public void testVoterValid_NoMatch() throws SQLException {
++        Model model = new Model();
++        model.setVoterId("9999999999"); // A voter ID that should not exist
++        model.setPass("wrongPass");
++        ResultSet rs = Dao.voterValid(model);
++        assertFalse(rs.next(), "ResultSet should be empty for invalid voter credentials.");
++        rs.close(); // Ensure ResultSet is closed
+     }
+ 
+     @Test
+     public void testRegister() throws SQLException {
+         Model model = new Model();
+-        model.setVoterId("987654321");
++        model.setVoterId(testVoterId); // Use unique ID for this test
+         model.setFullName("John Doe");
+-        model.setUserName("johndoe");
++        model.setUserName("johndoe_" + testVoterId); // Make username unique too
+         model.setGender("Male");
+         model.setDob("1990-01-01");
+-        model.setEmail("johndoe@example.com");
++        model.setEmail("johndoe_" + testVoterId + "@example.com");
+         model.setPass("password123");
+         int result = Dao.register(model);
+-        assertEquals(1, result);
++        assertEquals(1, result, "Register should return 1 on successful insertion.");
++    }
++
++    // AC2: Correct exception handling for failed SQL queries (e.g., due to constraint violations).
++    @Test
++    public void testRegister_DuplicateVoterIdThrowsSQLException() throws SQLException {
++        Model model = new Model();
++        model.setVoterId(duplicateTestVoterId);
++        model.setFullName("Jane Doe");
++        model.setUserName("janedoe_" + duplicateTestVoterId);
++        model.setGender("Female");
++        model.setDob("1991-02-02");
++        model.setEmail("janedoe_" + duplicateTestVoterId + "@example.com");
++        model.setPass("securepass");
++
++        // First registration should succeed
++        int result = Dao.register(model);
++        assertEquals(1, result, "First registration with unique voter ID should succeed.");
++
++        // Attempting to register again with the same voterId should throw SQLException
++        // assuming voterId is a primary key or has a unique constraint.
++        assertThrows(SQLException.class, () -> {
++            Dao.register(model);
++        }, "Registering with a duplicate voterId should throw SQLException due to constraint violation.");
+     }
+ 
+     @Test
+@@ -51,14 +143,36 @@
+         model.setCompanyName("CompanyX");
+         model.setEmail("janedoe@example.com");
+         model.setMessage("Hello, this is a test message.");
+         int result = Dao.contact(model);
+-        assertEquals(1, result);
++        assertEquals(1, result, "Contact should return 1 on successful insertion.");
+     }
+ 
+     @Test
+     public void testDeleteVoter() throws SQLException {
+-        String voterId = "987654321";
+-        int result = Dao.deleteVoter(voterId);
+-        assertEquals(1, result);
++        // First, register a voter to ensure it exists for deletion
++        Model model = new Model();
++        model.setVoterId(voterIdToDelete);
++        model.setFullName("Voter To Delete");
++        model.setUserName("deleteuser_" + voterIdToDelete);
++        model.setGender("Other");
++        model.setDob("2000-01-01");
++        model.setEmail("deleteuser_" + voterIdToDelete + "@example.com");
++        model.setPass("deletepass");
++        Dao.register(model);
++
++        int result = Dao.deleteVoter(voterIdToDelete);
++        assertEquals(1, result, "Delete voter should return 1 for an existing voter.");
++
++        // Verify the voter is actually deleted
++        Model checkModel = new Model();
++        checkModel.setVoterId(voterIdToDelete);
++        checkModel.setPass("deletepass");
++        ResultSet rs = Dao.voterValid(checkModel);
++        assertFalse(rs.next(), "Deleted voter should no longer be valid.");
++        rs.close(); // Ensure ResultSet is closed
++    }
++
++    // AC3: Retrieval methods return expected empty/null results when no matching data exists.
++    @Test
++    public void testDeleteVoter_NonExistent() throws SQLException {
++        String nonExistentVoterId = generateUniqueVoterId(); // Use an ID that was never registered
++        int result = Dao.deleteVoter(nonExistentVoterId);
++        assertEquals(0, result, "Delete voter should return 0 for a non-existent voter.");
+     }
+ }
+```

@@ -11,9 +11,18 @@ public class Mailer {
         String to = "abc@mail.com";
         String subject = "nill";
         String msg = "test";
-        final String user = "abc@gmail.com";//change accordingly
-        final String pass = "xxxxxx";//change
 
+        // Read credentials from system properties or environment variables
+        // For example, run with: -Dmail.user=your_email@gmail.com -Dmail.pass=your_app_password
+        final String user = System.getProperty("mail.user");
+        final String pass = System.getProperty("mail.pass");
+
+        if (user == null || user.isEmpty() || pass == null || pass.isEmpty()) {
+            System.err.println("Error: Email username or password not set.");
+            System.err.println("Please provide credentials via system properties, e.g.,");
+            System.err.println("java -Dmail.user=your_email@gmail.com -Dmail.pass=your_app_password com.Email.Mailer");
+            return; // Exit if credentials are not available
+        }
 
 //1st step) Get the session object
         Properties props = new Properties();
