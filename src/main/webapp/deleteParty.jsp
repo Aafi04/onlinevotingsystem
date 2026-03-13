@@ -8,9 +8,17 @@
 
 <%@ page import="java.sql.*" %>
 <%@ page import="com.Dao.Dao" %>
+<%@ page import="java.util.UUID" %> <%-- Added for CSRF token generation --%>
 <%
 String input=null;
 String message= request.getParameter("msg");
+
+// CSRF token generation and storage in session
+String csrfToken = (String) session.getAttribute("csrfToken");
+if (csrfToken == null) {
+    csrfToken = UUID.randomUUID().toString();
+    session.setAttribute("csrfToken", csrfToken);
+}
 %>
 
 
@@ -35,35 +43,48 @@ String message= request.getParameter("msg");
                         <p>To remove party enter Party Code</p>
                         <hr>
                         <input type="text" placeholder="Party Code" name="party_code" required>
+                        <%-- Add CSRF token hidden field --%>
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
 
                         <hr>
                         <button type="submit" class="btn">Submit</button>
 
                         <%
-                            input=request.getParameter("party_code");
-                        if(input!=null) {
+// Retrieve the CSRF token from session for validation against the submitted token
+String currentCsrfToken = (String) session.getAttribute("csrfToken");
 
-                            int pid = Dao.getId(input);
+input=request.getParameter("party_code");
+// Only process deletion if it's a POST request and party_code is provided
+if (request.getMethod().equalsIgnoreCase("POST") && input!=null) {
+    String submittedCsrfToken = request.getParameter("csrfToken");
 
-                            Connection con = null;
-                            Class.forName("com.mysql.cj.jdbc.Driver");
-                            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/evoting", "root", "root");
-                            String sql = "delete from partytable where pid=?";
+    // Validate the CSRF token
+    if (submittedCsrfToken != null && submittedCsrfToken.equals(currentCsrfToken)) {
+        // CSRF token is valid, proceed with deletion
+        int pid = Dao.getId(input);
 
-                            PreparedStatement statement = con.prepareStatement(sql);
-                            statement.setInt(1, pid);
-                            int rs = statement.executeUpdate();
+        Connection con = null;
+        Class.forName("com.mysql.cj.jdbc.Driver");
+        con = DriverManager.getConnection("jdbc:mysql://localhost:3306/evoting", "root", "root");
+        String sql = "delete from partytable where pid=?";
 
-                            if (rs != 0) {
-                                response.sendRedirect("deleteParty.jsp?msg=success");
-                            } else {
+        PreparedStatement statement = con.prepareStatement(sql);
+        statement.setInt(1, pid);
+        int rs = statement.executeUpdate();
 
-
-                                response.sendRedirect("deleteParty.jsp?msg=failed");
-
-                            }
-                        }
-                            %>
+        if (rs != 0) {
+            response.sendRedirect("deleteParty.jsp?msg=success");
+        } else {
+            response.sendRedirect("deleteParty.jsp?msg=failed");
+        }
+        // For per-session tokens, it's not strictly necessary to regenerate after each use,
+        // but for single-use tokens, it would be done here.
+    } else {
+        // CSRF token mismatch or missing, redirect with an error message
+        response.sendRedirect("deleteParty.jsp?msg=csrfFailed");
+    }
+}
+%>
 
 
                     </div>
@@ -74,7 +95,9 @@ String message= request.getParameter("msg");
                         <%}else if(message.equals("failed")){
                         %>
                         <img src="images/alert-16.png" alt="Computer Man" style="width:23px;height:23px;" autofocus> <font color="#ff0000">Failed to Delete</font>
-
+                        <%}else if(message.equals("csrfFailed")){ // New message type for CSRF validation failure
+                        %>
+                        <img src="images/alert-16.png" alt="Computer Man" style="width:23px;height:23px;" autofocus> <font color="#ff0000">Security check failed. Please try again.</font>
                         <%}}%>
 
                         </div>

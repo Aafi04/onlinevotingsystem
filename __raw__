@@ -1,0 +1,172 @@
+```diff
+--- /dev/null
++++ b/src/test/java/com/Servlets/Voter/LoginTest.java
+@@ -0,0 +1,161 @@
++package com.Servlets.Voter;
++
++import com.Dao.Dao;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.MockedStatic;
++import org.mockito.Mockito;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import javax.servlet.RequestDispatcher;
++import javax.servlet.ServletException;
++import javax.servlet.http.HttpServletRequest;
++import javax.servlet.http.HttpServletResponse;
++import javax.servlet.http.HttpSession;
++import java.io.IOException;
++import java.sql.ResultSet;
++import java.sql.SQLException;
++
++import static org.mockito.ArgumentMatchers.anyString;
++import static org.mockito.Mockito.doNothing;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++public class LoginTest {
++
++    @InjectMocks
++    private Login servlet;
++
++    @Mock
++    private HttpServletRequest request;
++
++    @Mock
++    private HttpServletResponse response;
++
++    @Mock
++    private HttpSession session;
++
++    @Mock
++    private RequestDispatcher requestDispatcher;
++
++    @Mock
++    private ResultSet resultSet; // Mock for Dao.valid1 return
++
++    @BeforeEach
++    void setUp() throws IOException {
++        // Mock session and request dispatcher behavior
++        when(request.getSession()).thenReturn(session);
++        when(request.getRequestDispatcher(anyString())).thenReturn(requestDispatcher);
++        // Default response for sendRedirect to avoid NPE in case of multiple redirects
++        doNothing().when(response).sendRedirect(anyString());
++    }
++
++    @Test
++    @DisplayName("doGet - Logout action should remove session attributes and redirect to home")
++    void testDoGet_Logout() throws ServletException, IOException {
++        when(request.getParameter("action")).thenReturn("logout");
++
++        servlet.doGet(request, response);
++
++        verify(session).removeAttribute("voterId");
++        verify(session).removeAttribute("uname");
++        verify(response).sendRedirect("home.jsp");
++        verify(request, never()).getRequestDispatcher(anyString()); // Should not forward
++    }
++
++    @Test
++    @DisplayName("doGet - No action should forward to home.jsp")
++    void testDoGet_NoAction() throws ServletException, IOException {
++        when(request.getParameter("action")).thenReturn(null);
++
++        servlet.doGet(request, response);
++
++        verify(request).getRequestDispatcher("home.jsp");
++        verify(requestDispatcher).forward(request, response);
++        verify(response, never()).sendRedirect(anyString()); // Should not redirect
++    }
++
++    @Test
++    @DisplayName("doPost - Valid login should set session attributes and forward to voter.jsp")
++    void testDoPost_ValidLogin() throws ServletException, IOException, SQLException {
++        when(request.getParameter("voter_card_number")).thenReturn("VOTER123");
++        when(request.getParameter("password")).thenReturn("password123");
++
++        // --- IMPORTANT NOTE REGARDING STATIC METHOD MOCKING ---
++        // Dao.valid1 is a static method. Mocking static methods with Mockito's MockedStatic
++        // feature is used here. This requires Mockito version 3.4.0 or higher.
++        // If the project uses an older Mockito version or explicitly forbids 'mock-maker-inline',
++        // this approach would fail. In such a scenario, the Login servlet would need
++        // refactoring for dependency injection to enable true unit testing without a real database.
++        try (MockedStatic<Dao> mockedDao = Mockito.mockStatic(Dao.class)) {
++            mockedDao.when(() -> Dao.valid1(anyString())).thenReturn(resultSet);
++            when(resultSet.next()).thenReturn(true);
++            when(resultSet.getString(3)).thenReturn("TestUser"); // Mock username
++
++            servlet.doPost(request, response);
++
++            verify(session).setAttribute("voterId", "VOTER123");
++            verify(session).setAttribute("uname", "Welcome TestUser");
++            verify(request).getRequestDispatcher("voter.jsp");
++            verify(requestDispatcher).forward(request, response);
++            verify(response, never()).sendRedirect(anyString()); // Should not redirect
++        }
++    }
++
++    @Test
++    @DisplayName("doPost - Invalid login should set error attribute and redirect to home.jsp with invalid msg")
++    void testDoPost_InvalidLogin() throws ServletException, IOException, SQLException {
++        when(request.getParameter("voter_card_number")).thenReturn("WRONGID");
++        when(request.getParameter("password")).thenReturn("WRONGPASS");
++
++        try (MockedStatic<Dao> mockedDao = Mockito.mockStatic(Dao.class)) {
++            mockedDao.when(() -> Dao.valid1(anyString())).thenReturn(resultSet);
++            when(resultSet.next()).thenReturn(false); // No result found
++
++            servlet.doPost(request, response);
++
++            verify(request).setAttribute("error", "Invalid Account");
++            verify(response).sendRedirect("home.jsp?msg=invalid");
++            verify(session, never()).setAttribute(anyString(), anyString()); // No session set
++            verify(request, never()).getRequestDispatcher(anyString()); // No forwarding
++        }
++    }
++
++    @Test
++    @DisplayName("doPost - Empty credentials should result in invalid login redirect")
++    void testDoPost_EmptyCredentials() throws ServletException, IOException, SQLException {
++        when(request.getParameter("voter_card_number")).thenReturn("");
++        when(request.getParameter("password")).thenReturn("");
++
++        try (MockedStatic<Dao> mockedDao = Mockito.mockStatic(Dao.class)) {
++            mockedDao.when(() -> Dao.valid1(anyString())).thenReturn(resultSet);
++            when(resultSet.next()).thenReturn(false); // No result found for empty credentials
++
++            servlet.doPost(request, response);
++
++            verify(request).setAttribute("error", "Invalid Account");
++            verify(response).sendRedirect("home.jsp?msg=invalid");
++            verify(session, never()).setAttribute(anyString(), anyString());
++            verify(request, never()).getRequestDispatcher(anyString());
++        }
++    }
++
++    @Test
++    @DisplayName("doPost - SQLException during DAO interaction should redirect to home.jsp with error msg")
++    void testDoPost_SQLException() throws ServletException, IOException, SQLException {
++        when(request.getParameter("voter_card_number")).thenReturn("VOTER123");
++        when(request.getParameter("password")).thenReturn("password123");
++
++        try (MockedStatic<Dao> mockedDao = Mockito.mockStatic(Dao.class)) {
++            mockedDao.when(() -> Dao.valid1(anyString())).thenThrow(new SQLException("Database error"));
++
++            servlet.doPost(request, response);
++
++            verify(response).sendRedirect("home.jsp?msg=error");
++            verify(session, never()).setAttribute(anyString(), anyString());
++            verify(request, never()).setAttribute(anyString(), anyString());
++            verify(request, never()).getRequestDispatcher(anyString());
++        }
++    }
++}
+```
