@@ -1,4 +1,4 @@
-=== src/main/java/com/Servlets/Voter/Register.java ===
+=== src/main/java/com/Servlets/Voter/Login.java ===
 package com.Servlets.Voter;
 
 import com.Dao.Dao;
@@ -9,63 +9,76 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.Date;
+import java.sql.ResultSet;
 
-@WebServlet(name = "Register",value = "/Register")
-public class Register extends HttpServlet {
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String voterId=request.getParameter("voter_card_number");
-        String fullName=request.getParameter("name");
-        String username=request.getParameter("username");
-        String gender=request.getParameter("gender");
-        String dob=request.getParameter("dob");
-        String email=request.getParameter("email");
-        String password=request.getParameter("password");
 
-        String s = dob.substring(0,4);    //0-> starting index & 4-> character counting (yyyy format in dob so 4 character thts y 4)
-        Date d = new Date();
-        String s1=d.toString();    // converting object into string -> toString method is used
-        String s2=s1.substring(24);
-        int a =Integer.parseInt(s);	//user entered
-        int b=Integer.parseInt(s2);	//system value
+@WebServlet(name = "Login",value = "/Login")
+public class Login extends HttpServlet {
+    private static final long serialVersionUID = 1L;
 
-        if(a>1950 && (b-a) >=18) {
-            Model m = new Model();
-            m.setPass(password);
-            m.setVoterId(voterId);
-            m.setUserName(username);
-            m.setDob(dob);
-            m.setEmail(email);
-            m.setGender(gender);
-            m.setFullName(fullName);
+    public Login() {
+        super();
+    }
 
-            try {
-                int i = Dao.register(m);
-                if (i != 0) {
-                    response.sendRedirect("home.jsp?msg=success");
-                } else {
-                    // TODO: To enable more specific test cases for duplicate voter ID or email,
-                    // the Dao.register method would ideally return distinct error codes
-                    // (e.g., -1 for duplicate email, -2 for duplicate voter ID).
-                    // This servlet could then provide specific messages like:
-                    // if (i == -1) {
-                    //     response.sendRedirect("register.jsp?msg=duplicateEmail");
-                    // } else if (i == -2) {
-                    //     response.sendRedirect("register.jsp?msg=duplicateVoterId");
-                    // } else {
-                    //     response.sendRedirect("register.jsp?msg=failed");
-                    // }
-                    response.sendRedirect("register.jsp?msg=failed");
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        HttpSession session = request.getSession();
+        String action = request.getParameter("action");
+        if (action == null) {
+            request.getRequestDispatcher("home.jsp").forward(request, response);
+        } else {
+            if (action.equalsIgnoreCase("logout")) {
+                // Invalidate the session on logout for complete cleanup
+                if (session != null) {
+                    session.invalidate();
                 }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                // Redirect to a generic error page in case of an unexpected exception during registration
-                response.sendRedirect("register.jsp?msg=error");
+                response.sendRedirect("home.jsp");
             }
-        }else{
-                response.sendRedirect("register.jsp?msg=age");
+        }
+    }
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Get the current session, but don't create a new one if it doesn't exist yet
+        HttpSession session = request.getSession(false);
+
+        @SuppressWarnings("unused")
+        String action=request.getParameter("action");
+
+        String voterId = request.getParameter("voter_card_number");
+        String password = request.getParameter("password");
+
+        Model m=new Model();
+        m.setPass(password);
+        m.setVoterId(voterId);
+
+        try {
+            // Use the secure DAO method for validation.
+            // This method is assumed to use PreparedStatement internally and handle password hash verification.
+            ResultSet rs = Dao.voterValid(m);
+
+            if(rs.next()){
+                // Authentication successful
+
+                // Session Fixation Prevention: Invalidate the old session and create a new one
+                if (session != null) {
+                    session.invalidate();
+                }
+                session = request.getSession(true); // Create a brand new session
+
+                String username = "Welcome " + rs.getString(3); // Assuming column 3 is the username
+                session.setAttribute("voterId", voterId);
+                session.setAttribute("uname", username);
+                request.getRequestDispatcher("voter.jsp").forward(request,response);
+            }else{
+                // Authentication failed
+                request.setAttribute("error", "Invalid Account");
+                // Redirect to home with an error message
+                response.sendRedirect("home.jsp?msg=invalid");
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+            // Redirect to home with a generic error message in case of an exception
+            response.sendRedirect("home.jsp?msg=error");
         }
     }
 }
