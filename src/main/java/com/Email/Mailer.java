@@ -3,16 +3,48 @@ package com.Email;
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 
 public class Mailer {
+
+    private static String emailUser;
+    private static String emailPass;
+
+    static {
+        Properties emailConfig = new Properties();
+        try (InputStream input = Mailer.class.getClassLoader().getResourceAsStream("email.properties")) {
+            if (input == null) {
+                System.err.println("ERROR: email.properties not found in the classpath. Please ensure it's available.");
+                throw new RuntimeException("Email configuration file (email.properties) not found.");
+            }
+            emailConfig.load(input);
+
+            emailUser = emailConfig.getProperty("mail.username");
+            emailPass = emailConfig.getProperty("mail.password");
+
+            if (emailUser == null || emailPass == null) {
+                System.err.println("ERROR: 'mail.username' or 'mail.password' not found in email.properties.");
+                throw new RuntimeException("Missing required email credentials in email.properties.");
+            }
+
+        } catch (IOException ex) {
+            System.err.println("ERROR: Failed to load email.properties: " + ex.getMessage());
+            throw new RuntimeException("Failed to load email configuration.", ex);
+        } catch (Exception ex) {
+            System.err.println("ERROR: An unexpected error occurred during email configuration initialization: " + ex.getMessage());
+            throw new RuntimeException("Failed to initialize email configuration.", ex);
+        }
+    }
+
     public static void sendMail() {
 
         String to = "abc@mail.com";
         String subject = "nill";
         String msg = "test";
-        final String user = "abc@gmail.com";//change accordingly
-        final String pass = "xxxxxx";//change
+        final String user = emailUser; // Credentials loaded from external properties
+        final String pass = emailPass; // Credentials loaded from external properties
 
 
 //1st step) Get the session object
