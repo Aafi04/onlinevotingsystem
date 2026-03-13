@@ -2,58 +2,74 @@ package com.Servlets.Voter;
 
 import com.Dao.Dao;
 import com.Model.Model;
+import com.Servlets.AbstractRegistrationServlet; // Import the new base class
 
-import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Date;
 
 @WebServlet(name = "Register",value = "/Register")
-public class Register extends HttpServlet {
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String voterId=request.getParameter("voter_card_number");
-        String fullName=request.getParameter("name");
-        String username=request.getParameter("username");
-        String gender=request.getParameter("gender");
-        String dob=request.getParameter("dob");
-        String email=request.getParameter("email");
-        String password=request.getParameter("password");
+public class Register extends AbstractRegistrationServlet {
 
-        String s = dob.substring(0,4);    //0-> starting index & 4-> character counting (yyyy format in dob so 4 character thts y 4)
-        Date d = new Date();
-        String s1=d.toString();    // converting object into string -> toString method is used
-        String s2=s1.substring(24);
-        int a =Integer.parseInt(s);	//user entered
-        int b=Integer.parseInt(s2);	//system value
+    @Override
+    protected Model createAndPopulateModel(HttpServletRequest request) {
+        String voterId = request.getParameter("voter_card_number");
+        String fullName = request.getParameter("name");
+        String username = request.getParameter("username");
+        String gender = request.getParameter("gender");
+        String dob = request.getParameter("dob");
+        String email = request.getParameter("email");
+        String password = request.getParameter("password");
 
-        if(a>1950 && (b-a) >=18) {
-            Model m = new Model();
-            m.setPass(password);
-            m.setVoterId(voterId);
-            m.setUserName(username);
-            m.setDob(dob);
-            m.setEmail(email);
-            m.setGender(gender);
-            m.setFullName(fullName);
+        Model m = new Model();
+        m.setPass(password);
+        m.setVoterId(voterId);
+        m.setUserName(username);
+        m.setDob(dob);
+        m.setEmail(email);
+        m.setGender(gender);
+        m.setFullName(fullName);
+        return m;
+    }
 
-            try {
-                int i = Dao.register(m);
-                if (i != 0) {
-                    response.sendRedirect("home.jsp?msg=success");
-                    //response.sendRedirect("successRegister.jsp");
-                } else {
-                    response.sendRedirect("register.jsp?msg=failed");
-                    //response.sendRedirect("failRegister.jsp");
-                }
+    @Override
+    protected int executeRegistration(Model model) throws Exception {
+        return Dao.register(model);
+    }
 
-            } catch (Exception e) {
-                e.printStackTrace();
+    @Override
+    protected String getSuccessRedirectUrl() {
+        return "home.jsp?msg=success";
+    }
+
+    @Override
+    protected String getFailureRedirectUrl() {
+        return "register.jsp?msg=failed";
+    }
+
+    @Override
+    protected PreRegistrationResult performPreRegistrationChecks(HttpServletRequest request) {
+        String dob = request.getParameter("dob");
+        if (dob == null || dob.length() < 4) {
+            return new PreRegistrationResult(false, "register.jsp?msg=invalid_dob");
+        }
+
+        String userYearString = dob.substring(0,4);
+        Date currentDate = new Date(); // Uses current system date
+        String currentYearString = currentDate.toString().substring(24); // Extracts current year from date string
+
+        try {
+            int userYear = Integer.parseInt(userYearString);
+            int currentYear = Integer.parseInt(currentYearString);
+
+            if (userYear > 1950 && (currentYear - userYear) >= 18) {
+                return new PreRegistrationResult(true, null); // Age check passed
+            } else {
+                return new PreRegistrationResult(false, "register.jsp?msg=age"); // Age check failed
             }
-        }else{
-                response.sendRedirect("register.jsp?msg=age");
+        } catch (NumberFormatException e) {
+            e.printStackTrace(); // Log the error
+            return new PreRegistrationResult(false, "register.jsp?msg=invalid_dob_format");
         }
     }
 }

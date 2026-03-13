@@ -11,9 +11,16 @@ public class Mailer {
         String to = "abc@mail.com";
         String subject = "nill";
         String msg = "test";
-        final String user = "abc@gmail.com";//change accordingly
-        final String pass = "xxxxxx";//change
+        // Retrieve email username and password from system properties.
+        // These can be set via -Dmail.username=your_username -Dmail.password=your_password
+        // or loaded from a properties file and set into System properties programmatically.
+        final String mailUser = System.getProperty("mail.username");
+        final String mailPass = System.getProperty("mail.password");
 
+        // Validate that credentials are provided
+        if (mailUser == null || mailUser.isEmpty() || mailPass == null || mailPass.isEmpty()) {
+            throw new IllegalStateException("Email credentials (mail.username and mail.password) must be set as system properties.");
+        }
 
 //1st step) Get the session object
         Properties props = new Properties();
@@ -26,13 +33,13 @@ public class Mailer {
                 new Authenticator() {
                     @Override
                     protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication(user, pass);
+                        return new PasswordAuthentication(mailUser, mailPass);
                     }
                 });
 //2nd step)compose message
         try {
             Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(user));
+            message.setFrom(new InternetAddress(mailUser));
             message.setRecipient(Message.RecipientType.TO,new InternetAddress(to));
             message.setSubject(subject);
             message.setText(msg);
