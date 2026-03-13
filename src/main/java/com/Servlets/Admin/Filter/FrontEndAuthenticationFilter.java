@@ -33,7 +33,8 @@ public class FrontEndAuthenticationFilter implements Filter {
 
         HttpSession session = httpRequest.getSession(false);
 
-        boolean isLoggedIn = (session != null && session.getAttribute("customerUser") != null);
+        // Check for "uname" which is typically set during voter login
+        boolean isLoggedIn = (session != null && session.getAttribute("uname") != null);
 
         String loginURI = httpRequest.getContextPath() + "/login";
         boolean isLoginRequest = httpRequest.getRequestURI().equals(loginURI);
