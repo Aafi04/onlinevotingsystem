@@ -1,84 +1,113 @@
-=== src/main/java/com/Servlets/Voter/Login.java ===
-package com.Servlets.Voter;
-
-import com.Dao.Dao;
-import com.Model.Model;
+=== src/main/java/com/Servlets/Admin/Party/AddParty.java ===
+package com.Servlets.Admin.Party;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import javax.servlet.http.Part;
 import java.io.IOException;
-import java.sql.ResultSet;
+import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException; // Import SQLException
 
+@WebServlet(name = "AddParty",value = "/AddParty")
+@MultipartConfig(maxFileSize = 16177215) // Max file size 16MB (16 * 1024 * 1024 bytes)
+public class AddParty extends HttpServlet {
 
-@WebServlet(name = "Login",value = "/Login")
-public class Login extends HttpServlet {
-    private static final long serialVersionUID = 1L;
-
-    public Login() {
-        super();
-    }
-
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        HttpSession session = request.getSession();
-        String action = request.getParameter("action");
-        if (action == null) {
-            request.getRequestDispatcher("home.jsp").forward(request, response);
-        } else {
-            if (action.equalsIgnoreCase("logout")) {
-                // Invalidate the session on logout for complete cleanup
-                if (session != null) {
-                    session.invalidate();
-                }
-                response.sendRedirect("home.jsp");
-            }
-        }
-    }
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // Get the current session, but don't create a new one if it doesn't exist yet
-        HttpSession session = request.getSession(false);
+        String partyCode = request.getParameter("party_code");
+        String partyName = request.getParameter("pName");
 
-        @SuppressWarnings("unused")
-        String action=request.getParameter("action");
+        // 1. Server-side validation for party details
+        if (partyCode == null || partyCode.trim().isEmpty() || partyName == null || partyName.trim().isEmpty()) {
+            System.err.println("Validation failed: Party code or name is missing/empty.");
+            response.sendRedirect("addParty.jsp?msg=invalid_input");
+            return; // Stop further processing
+        }
 
-        String voterId = request.getParameter("voter_card_number");
-        String password = request.getParameter("password");
-
-        Model m=new Model();
-        m.setPass(password);
-        m.setVoterId(voterId);
+        InputStream inputStream = null;
+        Part filePart = null;
+        Connection con = null;
+        PreparedStatement ps = null;
 
         try {
-            // Use the secure DAO method for validation.
-            // This method is assumed to use PreparedStatement internally and handle password hash verification.
-            ResultSet rs = Dao.voterValid(m);
+            // Attempt to retrieve the file part
+            filePart = request.getPart("image");
 
-            if(rs.next()){
-                // Authentication successful
-
-                // Session Fixation Prevention: Invalidate the old session and create a new one
-                if (session != null) {
-                    session.invalidate();
-                }
-                session = request.getSession(true); // Create a brand new session
-
-                String username = "Welcome " + rs.getString(3); // Assuming column 3 is the username
-                session.setAttribute("voterId", voterId);
-                session.setAttribute("uname", username);
-                request.getRequestDispatcher("voter.jsp").forward(request,response);
-            }else{
-                // Authentication failed
-                request.setAttribute("error", "Invalid Account");
-                // Redirect to home with an error message
-                response.sendRedirect("home.jsp?msg=invalid");
+            // 2. File upload validation and handling
+            // Check if a file was actually uploaded (assuming photo is mandatory)
+            if (filePart == null || filePart.getSize() == 0) {
+                System.err.println("File upload failed: No file selected or file is empty.");
+                response.sendRedirect("addParty.jsp?msg=no_file_selected");
+                return;
             }
-        }catch (Exception e){
+
+            // Get input stream from the file part
+            inputStream = filePart.getInputStream();
+
+            // 3. Database operation
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/evoting", "root", "root");
+
+            String sql = "INSERT INTO partyTable (partyCode, partyName, photo) values (?, ?, ?)";
+            ps = con.prepareStatement(sql);
+            ps.setString(1, partyCode);
+            ps.setString(2, partyName);
+            ps.setBlob(3, inputStream); // inputStream is guaranteed not null here
+
+            int result = ps.executeUpdate();
+            if (result != 0) {
+                response.sendRedirect("addParty.jsp?msg=success");
+            } else {
+                System.err.println("Database insert failed: No rows affected.");
+                response.sendRedirect("addParty.jsp?msg=failed_db_insert");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Database error during party addition: " + e.getMessage());
+            response.sendRedirect("addParty.jsp?msg=db_error");
+            e.printStackTrace(); // Log the full stack trace for debugging
+        } catch (ClassNotFoundException e) {
+            System.err.println("JDBC Driver not found: " + e.getMessage());
+            response.sendRedirect("addParty.jsp?msg=driver_error");
             e.printStackTrace();
-            // Redirect to home with a generic error message in case of an exception
-            response.sendRedirect("home.jsp?msg=error");
+        } catch (IOException e) {
+            // Catches errors during file stream operations (e.g., file_read_error)
+            // or if request.getPart() fails due to disk issues.
+            System.err.println("File I/O error during upload: " + e.getMessage());
+            response.sendRedirect("addParty.jsp?msg=file_io_error");
+            e.printStackTrace();
+        } catch (ServletException e) {
+            // Catches errors from request.getPart() like file size exceeding limits (IllegalStateException as cause)
+            System.err.println("Servlet error during file upload: " + e.getMessage());
+            response.sendRedirect("addParty.jsp?msg=file_upload_error");
+            e.printStackTrace();
+        } catch (Exception e) { // Catch any other unexpected exceptions
+            System.err.println("An unexpected error occurred during party addition: " + e.getMessage());
+            response.sendRedirect("addParty.jsp?msg=unknown_error");
+            e.printStackTrace();
+        } finally {
+            // Close resources in reverse order of opening to prevent resource leaks
+            try {
+                if (inputStream != null) inputStream.close();
+            } catch (IOException e) {
+                System.err.println("Error closing input stream: " + e.getMessage());
+            }
+            try {
+                if (ps != null) ps.close();
+            } catch (SQLException e) {
+                System.err.println("Error closing prepared statement: " + e.getMessage());
+            }
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                System.err.println("Error closing database connection: " + e.getMessage());
+            }
         }
     }
 }

@@ -5,8 +5,10 @@ import com.Model.Model;
 
 import java.io.IOException;
 import java.sql.ResultSet;
-import java.util.logging.Level; // Added for logging
-import java.util.logging.Logger; // Added for logging
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -19,7 +21,6 @@ import javax.servlet.http.HttpSession;
 public class AdminLogin extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
-    private static final Logger logger = Logger.getLogger(AdminLogin.class.getName()); // Logger instance
 
     public AdminLogin() {
         super();
@@ -32,10 +33,8 @@ public class AdminLogin extends HttpServlet {
             request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
         } else {
             if (action.equalsIgnoreCase("logout")) {
-                // Invalidate the session on logout to prevent lingering session data
-                if (sessionAdmin != null) {
-                    sessionAdmin.invalidate();
-                }
+                sessionAdmin.removeAttribute("adminId");
+                sessionAdmin.removeAttribute("adminName");
                 response.sendRedirect("adminPanel.jsp");
             }
         }
@@ -43,6 +42,7 @@ public class AdminLogin extends HttpServlet {
 
     @SuppressWarnings("static-access")
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        HttpSession sessionAdmin = request.getSession();
         String username = request.getParameter("username");
         String password = request.getParameter("password");
 
@@ -50,30 +50,44 @@ public class AdminLogin extends HttpServlet {
         Dao dao = new Dao();
         Model model = new Model();
         model.setUserName(username);
-        model.setPass(password);
 
         try {
-            ResultSet rs = dao.adminValid(model);
+            ResultSet rs = dao.adminValid(model); // This now fetches password_hash and salt
             if (rs.next()) {
-                // Invalidate the old session to prevent session fixation
-                HttpSession oldSession = request.getSession(false);
-                if (oldSession != null) {
-                    oldSession.invalidate();
-                }
+                String storedHash = rs.getString("password_hash"); // Assuming column name 'password_hash'
+                String storedSalt = rs.getString("salt");           // Assuming column name 'salt'
 
-                // Create a new session
-                HttpSession newSession = request.getSession(true);
-                newSession.setAttribute("adminId", rs.getInt("adminId"));
-                newSession.setAttribute("adminName", rs.getString("username"));
-                response.sendRedirect("adminPanel.jsp"); // Ensure this path is correct
+                // Decode salt from Base64
+                byte[] saltBytes = Base64.getDecoder().decode(storedSalt);
+
+                // Hash the provided password with the retrieved salt
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                md.update(saltBytes);
+                byte[] hashedPassword = md.digest(password.getBytes("UTF-8"));
+                String base64HashedPassword = Base64.getEncoder().encodeToString(hashedPassword);
+
+                // Compare the newly generated hash with the stored hash
+                if (base64HashedPassword.equals(storedHash)) {
+                    sessionAdmin.setAttribute("adminId", rs.getInt("adminId"));
+                    sessionAdmin.setAttribute("adminName", rs.getString("username"));
+                    response.sendRedirect("adminPanel.jsp"); // Ensure this path is correct
+                } else {
+                    // Password mismatch
+                    request.setAttribute("message", "invalid");
+                    request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
+                }
             } else {
+                // User not found
                 request.setAttribute("message", "invalid");
                 request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
             }
+        } catch (NoSuchAlgorithmException | IOException e) {
+            e.printStackTrace();
+            request.setAttribute("message", "error");
+            request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
         } catch (Exception e) {
-            // Log the exception instead of printing stack trace
-            logger.log(Level.SEVERE, "Error during admin login for user: " + username, e);
-            request.setAttribute("message", "error"); // Optionally set an error message for the user
+            e.printStackTrace();
+            request.setAttribute("message", "error");
             request.getRequestDispatcher("adminPanel.jsp").forward(request, response);
         }
     }

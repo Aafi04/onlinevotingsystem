@@ -14,7 +14,7 @@
 <% if(session.getAttribute("adminName")!=null){
 %>
 <ul>
-    <li><a class="active" href="#" aria-disabled="true"><c:out value="${sessionScope.adminName}"/></a></li>
+    <li><a class="active" href="#" aria-disabled="true"><c:out value="${sessionScope.adminName}" /></a></li>
     <li style="float:right"><a href="adminLogout.jsp">Logout</a></li>
     <li style="float:right"><a href="adminRegister.jsp">New Admin</a></li>
     <li style="float:right"><a href="addParty.jsp">Party</a></li>
