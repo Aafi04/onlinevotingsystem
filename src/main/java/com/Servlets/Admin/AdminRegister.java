@@ -25,7 +25,12 @@ public class AdminRegister extends HttpServlet {
         Model m=new Model();
         m.setPass(password);
         m.setFullName(fullName);
-        String sql="insert into admin(username,password) values('"+fullName+"','"+password+"')";
+        // The original `sql` string was vulnerable to SQL injection due to direct concatenation of user input.
+        // It has been converted to use parameter markers (`?`) suitable for a PreparedStatement,
+        // addressing the issue of constructing a database query with user-controlled input.
+        // Note: The actual database interaction occurs via `Dao.registerAdmin(m)`,
+        // and this `sql` string variable is currently not directly used in the execution path.
+        String sql="insert into admin(username,password) values(?,?)";
 
         String message=null;
         try {

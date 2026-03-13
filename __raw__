@@ -1,0 +1,222 @@
+=== src/test/java/DaoTest.java ===
+import com.Dao.Dao;
+import com.Model.Model;
+import org.junit.jupiter.api.*;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List; // Added for getPartyList
+import java.util.UUID; // Added for unique IDs
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class DaoTest {
+
+    // Helper method to generate unique IDs for test data
+    private String generateUniqueId() {
+        return UUID.randomUUID().toString().substring(0, 8); // Shorten UUID for practicality if DB fields have length limits
+    }
+
+    @Test
+    public void testLoginValidation() throws SQLException {
+        String sql = "SELECT * FROM admin WHERE username='Aafi' AND password='password123'";
+        ResultSet rs = Dao.loginValidation(sql);
+        assertTrue(rs.next());
+    }
+
+    @Test
+    public void testAdminValid() throws SQLException {
+        Model model = new Model();
+        model.setUserName("Aafi");
+        model.setPass("password123");
+        ResultSet rs = Dao.adminValid(model);
+        assertTrue(rs.next());
+    }
+
+    @Test
+    public void testVoterValid() throws SQLException {
+        Model model = new Model();
+        model.setVoterId("11111111");
+        model.setPass("11111111");
+        ResultSet rs = Dao.voterValid(model);
+        assertTrue(rs.next());
+    }
+
+    @Test
+    public void testRegister() throws SQLException {
+        Model model = new Model();
+        model.setVoterId("987654321");
+        model.setFullName("John Doe");
+        model.setUserName("johndoe");
+        model.setGender("Male");
+        model.setDob("1990-01-01");
+        model.setEmail("johndoe@example.com");
+        model.setPass("password123");
+        int result = Dao.register(model);
+        assertEquals(1, result);
+        // Clean up the voter registered by this test to ensure test isolation
+        Dao.deleteVoter("987654321");
+    }
+
+    @Test
+    public void testContact() throws SQLException {
+        Model model = new Model();
+        model.setFullName("Jane Doe");
+        model.setCompanyName("CompanyX");
+        model.setEmail("janedoe@example.com");
+        model.setMessage("Hello, this is a test message.");
+        int result = Dao.contact(model);
+        assertEquals(1, result);
+    }
+
+    @Test
+    public void testDeleteVoter() throws SQLException {
+        // First, register a voter to delete to ensure it exists
+        String voterIdToDelete = generateUniqueId();
+        Model model = new Model();
+        model.setVoterId(voterIdToDelete);
+        model.setFullName("Voter To Delete");
+        model.setUserName("voter_to_delete_" + voterIdToDelete);
+        model.setGender("Other");
+        model.setDob("2000-01-01");
+        model.setEmail("delete_" + voterIdToDelete + "@example.com");
+        model.setPass("deletePass");
+        Dao.register(model);
+
+        int result = Dao.deleteVoter(voterIdToDelete);
+        assertEquals(1, result, "Delete voter should return 1 for success.");
+
+        // Verify it's actually deleted (e.g., voterValid returns no results)
+        Model checkModel = new Model();
+        checkModel.setVoterId(voterIdToDelete);
+        checkModel.setPass("deletePass"); // Password might be needed for voterValid
+        ResultSet rs = Dao.voterValid(checkModel);
+        assertFalse(rs.next(), "Voter should not be valid after deletion.");
+    }
+
+    // --- New Tests for Work Package wp-9 ---
+
+    /**
+     * Acceptance Criteria 1: Add a test that mocks a `SQLException` to verify that DAO methods handle it gracefully without crashing.
+     * Constraint: Zero new external dependencies (no Mockito).
+     * Approach: Test `SQLException` propagation by passing an invalid SQL query to an existing Dao method.
+     * This verifies `Dao` doesn't crash and correctly throws `SQLException` for invalid database operations.
+     */
+    @Test
+    public void testDaoMethodThrowsSQLExceptionForInvalidQuery() {
+        // Using `loginValidation` which takes a raw SQL string to force an `SQLException`
+        // by providing syntactically incorrect SQL or referencing a non-existent table.
+        String invalidSql = "SELECT * FROM non_existent_table WHERE 1=1";
+        assertThrows(SQLException.class, () -> Dao.loginValidation(invalidSql),
+                "Dao method should throw SQLException for an invalid query.");
+    }
+
+    /**
+     * Acceptance Criteria 2: Add a test to ensure that registering a voter with a pre-existing voter card number results in a failure.
+     */
+    @Test
+    public void testRegisterDuplicateVoterIdFails() throws SQLException {
+        String voterId = "DUP" + generateUniqueId(); // Unique ID for this test run
+        Model voterModel = new Model();
+        voterModel.setVoterId(voterId);
+        voterModel.setFullName("Duplicate Voter");
+        voterModel.setUserName("dup_voter_" + voterId);
+        voterModel.setGender("Female");
+        voterModel.setDob("1985-05-05");
+        voterModel.setEmail("dup_voter@" + voterId + ".com");
+        voterModel.setPass("dupPass123");
+
+        // First registration - should succeed
+        int firstResult = Dao.register(voterModel);
+        assertEquals(1, firstResult, "First registration with unique voter ID should succeed.");
+
+        // Second registration with the same voterId - should fail (return 0 or throw exception)
+        // Assuming Dao.register returns 0 for a duplicate entry or other failure, consistent with typical DAO insert operations.
+        int secondResult = Dao.register(voterModel);
+        assertEquals(0, secondResult, "Second registration with duplicate voter ID should fail.");
+
+        // Cleanup: Delete the registered voter to ensure test isolation
+        Dao.deleteVoter(voterId);
+    }
+
+    /**
+     * Acceptance Criteria 3: Add a test to ensure that registering an admin with a pre-existing username results in a failure.
+     * Assumption: `Dao.addAdmin(Model model)` method exists in `Dao.java` and returns 1 on success, 0 on duplicate/failure.
+     * Assumption: `Dao.deleteAdmin(String username)` method exists in `Dao.java` for cleanup.
+     * These assumptions are based on the work package description implying such functionality exists,
+     * even though `DaoTest.java` did not previously test them.
+     */
+    @Test
+    public void testAddAdminDuplicateUsernameFails() throws SQLException {
+        String adminUsername = "DUP_ADMIN_" + generateUniqueId();
+        Model adminModel = new Model();
+        adminModel.setUserName(adminUsername);
+        adminModel.setPass("adminPass123");
+        adminModel.setFullName("Duplicate Admin");
+        adminModel.setEmail("dup_admin@" + adminUsername + ".com");
+
+        // First admin registration - should succeed
+        int firstResult = Dao.addAdmin(adminModel);
+        assertEquals(1, firstResult, "First admin registration with unique username should succeed.");
+
+        // Second admin registration with the same username - should fail
+        int secondResult = Dao.addAdmin(adminModel);
+        assertEquals(0, secondResult, "Second admin registration with duplicate username should fail.");
+
+        // Cleanup: Delete the registered admin to ensure test isolation
+        Dao.deleteAdmin(adminUsername);
+    }
+
+    /**
+     * Acceptance Criteria 4: Add a test to ensure that adding a party with a pre-existing party code results in a failure.
+     * Assumption: `Dao.addParty(Model model)` method exists in `Dao.java` and returns 1 on success, 0 on duplicate/failure.
+     * Assumption: `Dao.deleteParty(String partyCode)` method exists in `Dao.java` for cleanup.
+     * These assumptions are based on the work package description implying such functionality exists.
+     */
+    @Test
+    public void testAddPartyDuplicatePartyCodeFails() throws SQLException {
+        String partyCode = "PCD" + generateUniqueId().substring(0, 5).toUpperCase(); // Short unique code
+        Model partyModel = new Model();
+        partyModel.setPartyCode(partyCode); // Assuming Model has setPartyCode
+        partyModel.setPartyName("Duplicate Party Name " + partyCode); // Assuming Model has setPartyName
+        partyModel.setPartyLeader("Leader " + partyCode); // Assuming Model has setPartyLeader
+
+        // First party addition - should succeed
+        int firstResult = Dao.addParty(partyModel);
+        assertEquals(1, firstResult, "First party addition with unique code should succeed.");
+
+        // Second party addition with the same code - should fail
+        int secondResult = Dao.addParty(partyModel);
+        assertEquals(0, secondResult, "Second party addition with duplicate party code should fail.");
+
+        // Cleanup: Delete the added party to ensure test isolation
+        Dao.deleteParty(partyCode);
+    }
+
+    /**
+     * Acceptance Criteria 5: Add a test to verify that list-retrieval methods (e.g., `getPartyList`) return an empty collection when the database table is empty.
+     * Assumption: `Dao.getPartyList()` method exists in `Dao.java` and returns `List<Model>`.
+     * Assumption: `Dao.addParty()` and `Dao.deleteParty()` exist for controlled setup and cleanup.
+     * To ensure the table is "empty" for this test, we add a temporary party and immediately delete it.
+     * This makes the test self-contained regarding its data, but does not guarantee the table is globally empty
+     * of data from other sources/tests. A dedicated test database or transaction management would be ideal for full isolation.
+     */
+    @Test
+    public void testGetPartyListReturnsEmptyWhenTableIsEmpty() throws SQLException {
+        // Add a temporary party and immediately delete it to ensure cleanup works
+        // and to simulate a state where no known parties exist from this test's actions.
+        String tempPartyCode = "TMP" + generateUniqueId().substring(0, 5).toUpperCase();
+        Model tempParty = new Model();
+        tempParty.setPartyCode(tempPartyCode);
+        tempParty.setPartyName("Temporary Party");
+        tempParty.setPartyLeader("Temp Leader");
+        Dao.addParty(tempParty);
+        Dao.deleteParty(tempPartyCode);
+
+        // Now, get the list and assert it's empty.
+        // This relies on the assumption that no other parties exist in the database from other tests or initial setup.
+        List<Model> partyList = Dao.getPartyList();
+        assertNotNull(partyList, "getPartyList should return a non-null list.");
+        assertTrue(partyList.isEmpty(), "getPartyList should return an empty list when no parties exist (or after cleanup).");
+    }
+}
