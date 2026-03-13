@@ -1,86 +1,71 @@
-```diff
---- a/src/test/java/DaoTest.java
-+++ b/src/test/java/DaoTest.java
-@@ -9,6 +9,11 @@
- 
- public class DaoTest {
- 
-+    // Helper to generate unique IDs for test data
-+    private String generateUniqueId() {
-+        return String.valueOf(System.currentTimeMillis());
-+    }
-+
-     @Test
-     public void testLoginValidation() throws SQLException {
-         String sql = "SELECT * FROM admin WHERE username='Aafi' AND password='password123'";
-@@ -34,6 +39,9 @@
- 
-     @Test
-     public void testRegister() throws SQLException {
-+        // Note: This test uses a hardcoded voterId "987654321".
-+        // For repeated test runs, ensure the database state is reset or
-+        // this voter is deleted before this test executes, e.g., by testDeleteVoter.
-         Model model = new Model();
-         model.setVoterId("987654321");
-         model.setFullName("John Doe");
-@@ -62,4 +70,55 @@
-         int result = Dao.deleteVoter(voterId);
-         assertEquals(1, result);
-     }
-+
-+    // --- New tests for error handling ---
-+
-+    @Test
-+    public void testRegisterUniqueConstraintViolation() throws SQLException {
-+        String voterId = "UCV_" + generateUniqueId();
-+        String username = "ucv_user_" + generateUniqueId();
-+        Model model = new Model();
-+        model.setVoterId(voterId);
-+        model.setFullName("Unique Constraint Test");
-+        model.setUserName(username);
-+        model.setGender("Other");
-+        model.setDob("2000-01-01");
-+        model.setEmail(username + "@example.com");
-+        model.setPass("password");
-+
-+        try {
-+            // First registration should succeed
-+            int result1 = Dao.register(model);
-+            assertEquals(1, result1, "First registration should succeed");
-+
-+            // Second registration with the same unique data should throw SQLException
-+            SQLException thrown = assertThrows(SQLException.class, () -> {
-+                Dao.register(model);
-+            }, "Expected SQLException for unique constraint violation on second registration");
-+
-+            // Optionally, assert specific SQLState or error message if known and stable
-+            // Example: assertTrue(thrown.getMessage().contains("Duplicate entry"), "Error message should indicate duplicate entry");
-+
-+        } finally {
-+            // Clean up the registered voter to ensure idempotency for test runs
-+            // Note: If the second register call throws an exception, the voter might still be in the DB.
-+            // We attempt to delete it regardless.
-+            Dao.deleteVoter(voterId);
-+        }
-+    }
-+
-+    @Test
-+    public void testSqlExceptionForInvalidQuery() {
-+        // Provide a syntactically invalid SQL string to simulate an SQL exception during operation
-+        String invalidSql = "SELECT * FROM non_existent_table WHERE id='1'";
-+        
-+        // Expect an SQLException to be thrown for an invalid SQL query
-+        SQLException thrown = assertThrows(SQLException.class, () -> {
-+            Dao.loginValidation(invalidSql);
-+        }, "Expected SQLException for an invalid SQL query");
-+
-+        // Optionally, check the message or SQLState if specific error handling is expected
-+        // Example: assertTrue(thrown.getMessage().contains("Table 'db_name.non_existent_table' doesn't exist"), "Error message should indicate table not found");
-+    }
-+    // Note: Testing database connection failures directly by "mocking" is not feasible without modifying
-+    // the static Dao class to allow dependency injection or a configurable connection source.
-+    // Under the current constraints (zero changes to Dao.java or its public API signatures),
-+    // we cannot programmatically simulate a connection failure from this test class.
-+    // The above tests cover other types of SQL exceptions during operations (unique constraints, invalid queries).
- }
-```
+=== src/main/java/com/Servlets/Voter/Register.java ===
+package com.Servlets.Voter;
+
+import com.Dao.Dao;
+import com.Model.Model;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Date;
+
+@WebServlet(name = "Register",value = "/Register")
+public class Register extends HttpServlet {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String voterId=request.getParameter("voter_card_number");
+        String fullName=request.getParameter("name");
+        String username=request.getParameter("username");
+        String gender=request.getParameter("gender");
+        String dob=request.getParameter("dob");
+        String email=request.getParameter("email");
+        String password=request.getParameter("password");
+
+        String s = dob.substring(0,4);    //0-> starting index & 4-> character counting (yyyy format in dob so 4 character thts y 4)
+        Date d = new Date();
+        String s1=d.toString();    // converting object into string -> toString method is used
+        String s2=s1.substring(24);
+        int a =Integer.parseInt(s);	//user entered
+        int b=Integer.parseInt(s2);	//system value
+
+        if(a>1950 && (b-a) >=18) {
+            Model m = new Model();
+            m.setPass(password);
+            m.setVoterId(voterId);
+            m.setUserName(username);
+            m.setDob(dob);
+            m.setEmail(email);
+            m.setGender(gender);
+            m.setFullName(fullName);
+
+            try {
+                int i = Dao.register(m);
+                if (i != 0) {
+                    response.sendRedirect("home.jsp?msg=success");
+                } else {
+                    // TODO: To enable more specific test cases for duplicate voter ID or email,
+                    // the Dao.register method would ideally return distinct error codes
+                    // (e.g., -1 for duplicate email, -2 for duplicate voter ID).
+                    // This servlet could then provide specific messages like:
+                    // if (i == -1) {
+                    //     response.sendRedirect("register.jsp?msg=duplicateEmail");
+                    // } else if (i == -2) {
+                    //     response.sendRedirect("register.jsp?msg=duplicateVoterId");
+                    // } else {
+                    //     response.sendRedirect("register.jsp?msg=failed");
+                    // }
+                    response.sendRedirect("register.jsp?msg=failed");
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                // Redirect to a generic error page in case of an unexpected exception during registration
+                response.sendRedirect("register.jsp?msg=error");
+            }
+        }else{
+                response.sendRedirect("register.jsp?msg=age");
+        }
+    }
+}

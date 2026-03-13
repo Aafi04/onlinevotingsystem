@@ -28,7 +28,7 @@ public class AdminAuthenticationFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpSession session = httpRequest.getSession(false);
 
-        boolean isLoggedIn = (session != null && session.getAttribute("uname") != null);
+        boolean isAdminLoggedIn = (session != null && session.getAttribute("adminName") != null);
 
         String loginURI = httpRequest.getContextPath() + "/Admin/AdminLogin";
 
@@ -36,15 +36,15 @@ public class AdminAuthenticationFilter implements Filter {
 
         boolean isLoginPage = httpRequest.getRequestURI().endsWith("AdminLogin.jsp");
 
-        if (isLoggedIn && (isLoginRequest || isLoginPage)) {
+        if (isAdminLoggedIn && (isLoginRequest || isLoginPage)) {
             // the admin is already logged in and he's trying to login again
             // then forwards to the admin's homepage
             RequestDispatcher dispatcher = request.getRequestDispatcher("/Admin/");
             dispatcher.forward(request, response);
 
-        } else if (isLoggedIn || isLoginRequest) {
+        } else if (isAdminLoggedIn || isLoginRequest) {
             // continues the filter chain
-            // allows the request to reach the destination
+            // allows the request to reach the destination for logged-in admins or the login page itself
             chain.doFilter(request, response);
 
         } else {
