@@ -1,0 +1,60 @@
+=== src/main/webapp/header.jsp ===
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Election</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <link href="css/body.css" rel='stylesheet' type='text/css' />
+</head>
+<body>
+<ul>
+    <c:choose>
+        <%-- Case 1: Admin is logged in --%>
+        <c:when test="${sessionScope.adminName != null}">
+            <li><a class="active" href="#" aria-disabled="true">${sessionScope.adminName }</a></li>
+            <li style="float:right"><a href="adminLogout.jsp">Logout</a></li>
+            <li style="float:right"><a href="adminRegister.jsp">New Admin</a></li>
+            <li style="float:right"><a href="addParty.jsp">Party</a></li>
+            <li style="float:right"><a href="adminResult.jsp">Results</a></li>
+            <li style="float:right"><a href="adminVoter.jsp">Voters</a></li>
+            <li style="float:right"><a href="home.jsp">User's Login</a></li>
+        </c:when>
+        <%-- Case 2: Regular user is logged in --%>
+        <c:when test="${sessionScope.uname != null}">
+            <li><a class="active" aria-disabled="true">${sessionScope.uname }</a></li>
+            <li style="float:right"><a href="logout.jsp">Logout</a></li>
+            <li style="float:right"><a href="about.jsp">About</a></li>
+            <li style="float:right"><a href="contact.jsp">Contact us</a></li>
+        </c:when>
+        <%-- Case 3: Neither admin nor regular user is logged in --%>
+        <c:otherwise>
+            <c:choose>
+                <%-- Sub-case 3a: Admin context (e.g., admin page, but admin not logged in) --%>
+                <c:when test="${requestScope.isAdminContext == true}">
+                    <li><a class="active" href="adminPanel.jsp">Home</a></li>
+                    <li style="float:right"><a href="adminRegister.jsp">New Admin</a></li>
+                    <li style="float:right"><a href="home.jsp">User's Login</a></li>
+                </c:when>
+                <%-- Sub-case 3b: User/Public context (e.g., public page, no one logged in) --%>
+                <c:otherwise>
+                    <li><a class="active" href="home.jsp">Home</a></li>
+                    <li style="float:right"><a href="adminPanel.jsp">Admin</a></li>
+                    <li style="float:right"><a href="register.jsp">Signup</a></li>
+                    <li style="float:right"><a href="about.jsp">About</a></li>
+                    <li style="float:right"><a href="contact.jsp">Contact us</a></li>
+                </c:otherwise>
+            </c:choose>
+        </c:otherwise>
+    </c:choose>
+</ul>
+</body>
+</html>
+=== src/main/webapp/adminHeader.jsp ===
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<c:set var="isAdminContext" value="true" scope="request"/>
+<jsp:include page="header.jsp" />
+<c:remove var="isAdminContext" scope="request"/>

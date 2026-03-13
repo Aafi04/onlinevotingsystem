@@ -13,18 +13,24 @@ public class LogoutAdmin extends HttpServlet {
         super();
     }
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        HttpSession sessionAdmin = request.getSession(true);
-        sessionAdmin.invalidate();
-
-        // to expire a cookie
-        Cookie c = new Cookie("adminName", "");
-        response.addCookie(c);
-        Cookie[] c1 = request.getCookies();
-        c1[0].setMaxAge(0);
-
-        response.sendRedirect("adminPanel.jsp");
+        performLogout(request, response, "adminName", "adminPanel.jsp");
     }
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
+    }
+
+    private static void performLogout(HttpServletRequest request, HttpServletResponse response, String cookieName, String redirectPage) throws IOException {
+        HttpSession session = request.getSession(true);
+        session.invalidate();
+
+        // to expire a cookie
+        Cookie c = new Cookie(cookieName, "");
+        response.addCookie(c);
+        Cookie[] c1 = request.getCookies();
+        if (c1 != null && c1.length > 0) {
+            c1[0].setMaxAge(0);
+        }
+
+        response.sendRedirect(redirectPage);
     }
 }

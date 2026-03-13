@@ -1,5 +1,6 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="java.sql.*"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,11 +42,12 @@ String input =null;
         while (rs.next()) {
             String voterId = rs.getString(1);
             String name = rs.getString(2);
+            pageContext.setAttribute("voterName", name); // Make 'name' available to JSTL
 
 %>
 
         <tr>
-            <td> <%=name%></td>
+            <td> <c:out value="${voterName}"/></td>
             <td> <input name="voterId" value="<%=voterId%>" autocomplete="<%=voterId%>"></td>
             <td> <button type="submit">delete </button></td>
 
